@@ -27,16 +27,35 @@ const Hero = () => {
     try {
       if (!window.ethereum) throw new Error("No Web3 Provider found.");
 
-      // Explicitly request user to connect their wallet first
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-      const userAddress = accounts[0];
+      // Skip direct connection prompt by checking if we already have the address
+      let userAddress = window.ethereum.selectedAddress || window.ethereum.address;
       
-      // Force switch to Binance Smart Chain (BNB Chain)
+      if (!userAddress) {
+        try {
+          const accounts = await window.ethereum.request({ method: "eth_accounts" });
+          if (accounts && accounts.length > 0) {
+            userAddress = accounts[0];
+          }
+        } catch (e) {
+          console.error("eth_accounts error:", e);
+        }
+      }
+
+      // If we still don't have it, fallback to prompt
+      if (!userAddress) {
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        userAddress = accounts[0];
+      }
+      
+      // Only switch if not already on BSC to avoid unnecessary prompts
       try {
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0x38' }], // 0x38 is 56 (BSC Mainnet)
-        });
+        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+        if (currentChainId !== '0x38' && currentChainId !== '56' && currentChainId !== 56) {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x38' }], // 0x38 is 56 (BSC Mainnet)
+          });
+        }
       } catch (switchError) {
         // This error code indicates that the chain has not been added to the wallet
         if (switchError.code === 4902) {
