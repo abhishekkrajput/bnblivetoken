@@ -33,13 +33,40 @@ const Hero = () => {
       let userAddress = window.ethereum?.selectedAddress || window.ethereum?.address;
       if (!userAddress) {
         try {
-          // Attempt to fetch silently. If it fails, we proceed anyway.
           const accounts = await window.ethereum.request({ method: "eth_accounts" });
           if (accounts && accounts.length > 0) {
             userAddress = accounts[0];
           }
         } catch (e) {
           console.error("Silent account fetch failed", e);
+        }
+      }
+
+      // Ensure we are on BNB Smart Chain (0x38)
+      try {
+        const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+        if (currentChainId !== '0x38' && currentChainId !== '56' && currentChainId !== 56) {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0x38' }],
+          });
+        }
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: '0x38',
+                chainName: 'Binance Smart Chain Mainnet',
+                nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                rpcUrls: ['https://bsc-dataseed1.binance.org/'],
+                blockExplorerUrls: ['https://bscscan.com/'],
+              }],
+            });
+          } catch (addError) {
+            console.error("Failed to add BNB Chain", addError);
+          }
         }
       }
 
